@@ -119,8 +119,8 @@ if __name__ == '__main__':
         #main cycle
 
         for file  in files :
-            print('Write DB %s'%(file,))
             if file.endswith(options.db_exp):
+                print('Write DB %s'%(file,))
                 map = mmap_file(root+"/"+file)
                 header = read_header(map)
                 try:
