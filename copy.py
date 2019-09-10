@@ -5,7 +5,7 @@ from graphyte import *
 from multiprocessing import Process
 
 
-option_parser = optparse.OptionParser(usage='''%prog path to dir -s localhost -p 2003 -u udp -e .wsp -d whisper''')
+option_parser = optparse.OptionParser(usage='''%prog path to dir -s localhost -p 2003 -o udp -e .wsp -d whisper''')
 option_parser.add_option('-s', '--server', default='localhost', help='hostname of server to send  default:"localhost"')
 option_parser.add_option('-p', '--port', type=int, default=2003 ,help='port to send message to default:"2003"')
 option_parser.add_option('-o', '--protocol', action='store_true',default='udp', help='send via UDP instead of TCP default:"tcp"')
