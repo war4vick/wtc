@@ -1,19 +1,22 @@
 import os,mmap,time,struct,signal,sys,subprocess,logging,whisper,optparse
 from optparse import OptionParser
+from time import sleep
 import numpy as np
 from graphyte import *
 from multiprocessing import Process
-
+import status
+from datetime import datetime
 
 option_parser = optparse.OptionParser(usage='''%prog path to dir -s localhost -p 2003 -u udp -e .wsp -d whisper''')
 option_parser.add_option('-s', '--server', default='localhost', help='hostname of server to send  default:"localhost"')
 option_parser.add_option('-p', '--port', type=int, default=2003 ,help='port to send message to default:"2003"')
 option_parser.add_option('-o', '--protocol',default='udp', help='send via UDP instead of TCP default:"tcp"')
 option_parser.add_option('-e', '--db_exp', default='.wsp', help='database expansion default:".wsp"')
+option_parser.add_option('-l', '--metrics_len', type=int, default=100, help='database expansion default:".wsp"')
 option_parser.add_option('-d', '--db_name', default='whisper',type='string', help='Whisper database dir name default:"whisper"')
 option_parser.add_option( '--debug', default=False, action='store_true', help='debug')
 (options, args) = option_parser.parse_args()
-
+log_name = ''
 if options.debug:
     logging.basicConfig(
         level=logging.DEBUG ,
@@ -22,7 +25,7 @@ if options.debug:
         )
 else:
     logging.basicConfig(
-        filename='error_log.log',
+        filename='error_log_'+str(time.time())+'.log',
         level=logging.ERROR ,
         format='%(asctime)s.%(msecs)03d %(levelname)s %(module)s: %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
@@ -94,23 +97,48 @@ def read_header(map):
   }
   return header
 
+def progress(count, total, status=''):
+    bar_len = 60
+    filled_len = int(round(bar_len * count / float(total)))
+
+    percents = round(100.0 * count / float(total), 1)
+    bar = '=' * filled_len + '-' * (bar_len - filled_len)
+
+    sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
+    sys.stdout.flush()
+
 def dump_archives(archives,path):
+    print(path)
     for i, archive in enumerate(archives):
         offset = archive['offset']
-        for point in xrange(archive['points']):
-            (timestamp, value) = struct.unpack(whisper.pointFormat,map[offset:offset + whisper.pointSize])
-        if  timestamp != 0:
-            prefix=read_path(path)
-            logging.debug('Read prefix:%s'%(prefix)+' Value:%d'%(value,))
-            try:
+        print(' Read Archive %d'%(i,)+' retention:%d'%(archive['retention'],)+' secondsPerPoint:%d'%(archive['secondsPerPoint'],)+' Total point :%d '%(archive['points'],))
+        #sleep(2)
+        mass=""
+        num_point=0
+        try:
+            for point in xrange(archive['points']):
+                if  i == 3 :
+                    sys.exit()
+                (timestamp, value) = struct.unpack(whisper.pointFormat,map[offset:offset + whisper.pointSize])
+                prefix=read_path(path)
+                logging.debug(' Read prefix:%s'%(prefix)+' Timestamp:%d'%(timestamp,)+' Value:%d'%(value,))
                 sender = Sender(options.server,protocol=options.protocol)
-                sender.send('%s'%(prefix,), int(value), timestamp=int(timestamp))
-            except IOError as e:
-                logging.error('Error occurred ' + str(e) +' Prefix:%s'%(prefix,)+' Value:%d'%(value))
-
+                mass += sender.build_message(prefix, value, timestamp) #metric, value, timestamp, tags={}
+                num_point += 1
+                offset += whisper.pointSize
+                if num_point >= options.metrics_len or archive['points'] == point+1 :
+                    progress(point, archive['points'], status='')
+                    sender.send_mass(mass)
+                    mass=""
+                    num_point=0
+            print(' Readed point :%d '%(point+1,))
+            print(" It took "+ str(time.time()-time_start)+" seconds.")
+        except Exception as e:
+            print(e)
+            logging.error('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
 if __name__ == '__main__':
-    print('start')
     time_start = time.time()
+    print("Start time "+ datetime.utcfromtimestamp(time_start).strftime('%Y-%m-%d %H:%M:%S'))
     procs=[]
     #find all files in dir with path
     #root = full path to dir default:/var/lib/graphite/whisper/
@@ -120,18 +148,14 @@ if __name__ == '__main__':
 
         for file  in files :
             if file.endswith(options.db_exp):
-                print('Write DB %s'%(file,))
+                #print('Write DB %s'%(file,))
                 map = mmap_file(root+"/"+file)
                 header = read_header(map)
                 try:
-                    #run send current metrics databases to read like :/var/lib/graphite/whisper/*/*.wsp as subprocess
-                    proc = Process(target=dump_archives, args=(header['archives'],root+"/"+file))
-                    procs.append(proc)
-                    proc.start()
-
+                    dump_archives(header['archives'],root+"/"+file)
                 except IOError as e:
                     logging.error('Error occurred ' + str(e))
 
-    print("It took "+ str(time.time()-time_start)+" seconds.")    #logging.info('Success!!!!')
-    logging.info ("It took "+ str(time.time()-time_start)+" seconds.")
-    logging.info ("List processing complete.")
+   #logging.info('Success!!!!')
+logging.info ("It took "+ str(time.time()-time_start)+" seconds.")
+logging.info ("List processing complete.")
