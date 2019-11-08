@@ -112,38 +112,47 @@ def build_messages(path,offset):
         print('Error build_messages from [build_messages(path,offset)] ' + str(e))
 
 def progress(count, total, status=''):
-    bar_len = 60
+    bar_len = 55
     filled_len = int(round(bar_len * count / float(total)))
 
     percents = round(100.0 * count / float(total), 1)
     bar = '=' * filled_len + '-' * (bar_len - filled_len)
-
+    sys.stdout.write("\033[0;0m")
+    if percents == 100:
+        sys.stdout.write("\033[0;32m")
+    else:
+        sys.stdout.write("\033[1;31m")
     sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
     sys.stdout.flush()
 
 def dump_archives(archives,path):
-    print(path)
+    sys.stdout.write("\033[0;32m")
+    print(">Read from:%s"%(path,))
+    sys.stdout.write("\033[1;36m")
+    print(">>Write as:%s"%(read_path(path),))
+    sleep(1)
     for i, archive in enumerate(archives):
         offset = archive['offset']
-        print(' Read Archive %d'%(i,)+' retention:%d'%(archive['retention'],)+' secondsPerPoint:%d'%(archive['secondsPerPoint'],)+' Total point :%d '%(archive['points'],))
-
+        sys.stdout.write("\033[0;0m")
+        print('>>Read Archive %d'%(i,)+' retention:%d'%(archive['retention'],)+' secondsPerPoint:%d'%(archive['secondsPerPoint'],)+' Total point :%d '%(archive['points'],))
         mass=""
         num_point=0
         try:
             for point in xrange(archive['points']):
-
                 mass += build_messages(path,offset)
                 num_point += 1
                 offset += whisper.pointSize
                 #print(num_point)
+                #print(mass[1])
                 if num_point >= options.metrics_len or archive['points'] == point+1 :
-                    progress(point, archive['points'], status='')
+                    progress(point+1, archive['points'], status='')
                     sender = Sender(options.server,protocol=options.protocol)
                     sender.send_mass(mass)
                     mass=""
+
                     num_point=0
-                    #print(' Readed point :%d '%(point+1,))
-            print(" It took "+ str(time.time()-time_start)+" seconds.")
+            print('>>>Readed point :%d '%(point+1,))
+            print(">>>It took "+ str(time.time()-time_start)+" seconds.")
         except Exception as e:
             #print(e)
             logging.error('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
@@ -153,7 +162,6 @@ if __name__ == '__main__':
     time_start = time.time()
     print("Start time "+ datetime.utcfromtimestamp(time_start).strftime('%Y-%m-%d %H:%M:%S'))
     procs=[]
-    print()
     #path.split(os.sep)[-1])
     if os.path.isfile(path) == True :
         map = mmap_file(path)
@@ -165,11 +173,10 @@ if __name__ == '__main__':
 
             for file  in files :                                                        #main cycle
                 if file.endswith(options.db_exp):
-                #print('Write DB %s'%(read_path(root+"/"+file),))
+
                     map = mmap_file(root+"/"+file)
                     header = read_header(map)
                     try:
-                        print()
                         dump_archives(header['archives'],root+"/"+file)
                     except Exception as e:
                         logging.error('Error occurred ' + str(e))
