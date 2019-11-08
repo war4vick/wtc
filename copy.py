@@ -13,18 +13,11 @@ option_parser.add_option('-p', '--port', type=int, default=2003 ,help='port to s
 option_parser.add_option('-o', '--protocol',default='udp', help='send via UDP instead of TCP default:"tcp"')
 option_parser.add_option('-e', '--db_exp', default='.wsp', help='database expansion default:".wsp"')
 option_parser.add_option('-l', '--metrics_len', type=int, default=100, help='database expansion default:".wsp"')
-<<<<<<< HEAD
 option_parser.add_option('-d', '--db_name', default='none',type='string', help='Whisper database dir name default:"wtc"')
 option_parser.add_option( '--debug', default=False, action='store_true', help='debug')
 (options, args) = option_parser.parse_args()
 log_name = ''
 
-=======
-option_parser.add_option('-d', '--db_name', default='whisper',type='string', help='Whisper database dir name default:"whisper"')
-option_parser.add_option( '--debug', default=False, action='store_true', help='debug')
-(options, args) = option_parser.parse_args()
-log_name = ''
->>>>>>> fd0b16fd5b480d5d182829373b368b32259fb76a
 if options.debug:
     logging.basicConfig(
         level=logging.DEBUG ,
@@ -107,7 +100,6 @@ def read_header(map):
   }
   return header
 
-<<<<<<< HEAD
 def build_messages(path,offset):
     try:
         (timestamp, value) = struct.unpack(whisper.pointFormat,map[offset:offset + whisper.pointSize])
@@ -119,9 +111,6 @@ def build_messages(path,offset):
     except Exception as e:
         print('Error build_messages from [build_messages(path,offset)] ' + str(e))
 
-
-=======
->>>>>>> fd0b16fd5b480d5d182829373b368b32259fb76a
 def progress(count, total, status=''):
     bar_len = 60
     filled_len = int(round(bar_len * count / float(total)))
@@ -137,15 +126,12 @@ def dump_archives(archives,path):
     for i, archive in enumerate(archives):
         offset = archive['offset']
         print(' Read Archive %d'%(i,)+' retention:%d'%(archive['retention'],)+' secondsPerPoint:%d'%(archive['secondsPerPoint'],)+' Total point :%d '%(archive['points'],))
-<<<<<<< HEAD
-=======
-        #sleep(2)
->>>>>>> fd0b16fd5b480d5d182829373b368b32259fb76a
+
         mass=""
         num_point=0
         try:
             for point in xrange(archive['points']):
-<<<<<<< HEAD
+
                 mass += build_messages(path,offset)
                 num_point += 1
                 offset += whisper.pointSize
@@ -163,32 +149,10 @@ def dump_archives(archives,path):
             logging.error('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
             print('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
 
-=======
-                if  i == 3 :
-                    sys.exit()
-                (timestamp, value) = struct.unpack(whisper.pointFormat,map[offset:offset + whisper.pointSize])
-                prefix=read_path(path)
-                logging.debug(' Read prefix:%s'%(prefix)+' Timestamp:%d'%(timestamp,)+' Value:%d'%(value,))
-                sender = Sender(options.server,protocol=options.protocol)
-                mass += sender.build_message(prefix, value, timestamp) #metric, value, timestamp, tags={}
-                num_point += 1
-                offset += whisper.pointSize
-                if num_point >= options.metrics_len or archive['points'] == point+1 :
-                    progress(point, archive['points'], status='')
-                    sender.send_mass(mass)
-                    mass=""
-                    num_point=0
-            print(' Readed point :%d '%(point+1,))
-            print(" It took "+ str(time.time()-time_start)+" seconds.")
-        except Exception as e:
-            print(e)
-            logging.error('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
->>>>>>> fd0b16fd5b480d5d182829373b368b32259fb76a
 if __name__ == '__main__':
     time_start = time.time()
     print("Start time "+ datetime.utcfromtimestamp(time_start).strftime('%Y-%m-%d %H:%M:%S'))
     procs=[]
-<<<<<<< HEAD
     print()
     #path.split(os.sep)[-1])
     if os.path.isfile(path) == True :
@@ -212,24 +176,7 @@ if __name__ == '__main__':
     else :
         print("Error not right path")
         sys.exit()
-=======
-    #find all files in dir with path
-    #root = full path to dir default:/var/lib/graphite/whisper/
-    #files = all file in all dir default:*name*.wsp
-    for root, dirs, files in os.walk(path):
-        #main cycle
 
-        for file  in files :
-            if file.endswith(options.db_exp):
-                #print('Write DB %s'%(file,))
-                map = mmap_file(root+"/"+file)
-                header = read_header(map)
-                try:
-                    dump_archives(header['archives'],root+"/"+file)
-                except IOError as e:
-                    logging.error('Error occurred ' + str(e))
-
->>>>>>> fd0b16fd5b480d5d182829373b368b32259fb76a
    #logging.info('Success!!!!')
 logging.info ("It took "+ str(time.time()-time_start)+" seconds.")
 logging.info ("List processing complete.")
