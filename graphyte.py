@@ -36,7 +36,7 @@ class Sender:
         """Initialize a Sender instance, starting the background thread to
         send messages at given interval (in seconds) if "interval" is not
         None. Send at most "batch_size" messages per socket send operation (default=1000).
-        Default protocol is TCP; use protocol='udp' for UDP.        
+        Default protocol is TCP; use protocol='udp' for UDP.
         """
         self.host = host
         self.port = port
@@ -91,6 +91,17 @@ class Sender:
         message = message.encode('utf-8')
         return message
 
+    def send_mass(self, mass):
+        if self.interval is None:
+            self.send_message(mass)
+            #self.send_socket(mass)
+        else:
+            try:
+                self._queue.put_nowait(mass)
+            except queue.Full:
+                logger.error('queue full when sending {!r}'.format(mass))
+
+
     def send(self, metric, value, timestamp=None, tags={}):
         """Send given metric and (int or float) value to Graphite host.
         Performs send on background thread if "interval" was specified when
@@ -137,7 +148,7 @@ class Sender:
         try:
             self.send_message(message)
         except Exception as error:
-            logger.error('error sending message {!r}: {}'.format(message, error))
+            logger.error('error sending message  {}'.format(error))
         else:
             if self.log_sends:
                 elapsed_time = time.time() - start_time
