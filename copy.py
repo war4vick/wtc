@@ -10,11 +10,14 @@ from datetime import datetime
 option_parser = optparse.OptionParser(usage='''%prog path to dir -s localhost -p 2003 -u udp -e .wsp -d whisper''')
 option_parser.add_option('-s', '--server', default='localhost', help='hostname of server to send  default:"localhost"')
 option_parser.add_option('-p', '--port', type=int, default=2003 ,help='port to send message to default:"2003"')
-option_parser.add_option('-o', '--protocol',default='udp', help='send via UDP instead of TCP default:"tcp"')
+option_parser.add_option('-o', '--protocol',default='tcp', help='send via UDP instead of TCP default:"tcp"')
 option_parser.add_option('-e', '--db_exp', default='.wsp', help='database expansion default:".wsp"')
 option_parser.add_option('-l', '--metrics_len', type=int, default=100, help='database expansion default:".wsp"')
 option_parser.add_option('-d', '--db_name', default='none',type='string', help='Whisper database dir name default:"wtc"')
+option_parser.add_option('-x', '--timestamp_start', type=int, default=0, help=' ')
+option_parser.add_option('-z', '--timestamp_end', type=int, default=0, help=' ')
 option_parser.add_option( '--debug', default=False, action='store_true', help='debug')
+
 (options, args) = option_parser.parse_args()
 log_name = ''
 
@@ -42,8 +45,6 @@ def mmap_file(filename):
   map = mmap.mmap(fd, os.fstat(fd).st_size, prot=mmap.PROT_READ)
   os.close(fd)
   return map
-
-
 
 def read_path(path):
     full_path=os.path.abspath(path)                              #transformation path like /var/lib/graphite/whisper/carbon/metric/name.wsp to carbon prefix carbon.metric.name
@@ -100,14 +101,28 @@ def read_header(map):
   }
   return header
 
+def current_timestamp():
+    if not options.timestamp_end :
+        return time.time()
+    else :
+        return options.timestamp_end
+
+def find_timestamp(timestamp):
+    if  timestamp <= current_timestamp() and  timestamp >= options.timestamp_start :
+        return True
+    else :
+        return False
+
 def build_messages(path,offset):
     try:
         (timestamp, value) = struct.unpack(whisper.pointFormat,map[offset:offset + whisper.pointSize])
-        prefix=read_path(path)
-        sender = Sender(options.server,protocol=options.protocol)
-        message = sender.build_message(prefix, value, timestamp)
-        logging.debug(' Read prefix:%s'%(prefix)+' Timestamp:%d'%(timestamp,)+' Value:%d'%(value,))
-        return message
+        if find_timestamp(timestamp):
+            #print (timestamp)
+            prefix=read_path(path)
+            sender = Sender(options.server,protocol=options.protocol)
+            message = sender.build_message(prefix, value, timestamp)
+            logging.debug(' Read prefix:%s'%(prefix)+' Timestamp:%d'%(timestamp,)+' Value:%d'%(value,))
+            return message
     except Exception as e:
         print('Error build_messages from [build_messages(path,offset)] ' + str(e))
 
@@ -117,11 +132,11 @@ def progress(count, total, status=''):
 
     percents = round(100.0 * count / float(total), 1)
     bar = '=' * filled_len + '-' * (bar_len - filled_len)
-    sys.stdout.write("\033[0;0m")
+    sys.stdout.write("\033[0;32m")
     if percents == 100:
         sys.stdout.write("\033[0;32m")
     else:
-        sys.stdout.write("\033[1;31m")
+        sys.stdout.write("\033[2;33m")
     sys.stdout.write('[%s] %s%s ...%s\r' % (bar, percents, '%', status))
     sys.stdout.flush()
 
@@ -130,17 +145,20 @@ def dump_archives(archives,path):
     print(">Read from:%s"%(path,))
     sys.stdout.write("\033[1;36m")
     print(">>Write as:%s"%(read_path(path),))
-    sleep(1)
+    #sleep(1)
     for i, archive in enumerate(archives):
         offset = archive['offset']
         sys.stdout.write("\033[0;0m")
-        print('>>Read Archive %d'%(i,)+' retention:%d'%(archive['retention'],)+' secondsPerPoint:%d'%(archive['secondsPerPoint'],)+' Total point :%d '%(archive['points'],))
         mass=""
         num_point=0
+        read_point=0
         try:
             for point in xrange(archive['points']):
-                mass += build_messages(path,offset)
-                num_point += 1
+                data = build_messages(path,offset)
+                if  data :
+                    mass += data
+                    num_point += 1
+                    read_point +=1
                 offset += whisper.pointSize
                 #print(num_point)
                 #print(mass[1])
@@ -151,7 +169,7 @@ def dump_archives(archives,path):
                     mass=""
 
                     num_point=0
-            print('>>>Readed point :%d '%(point+1,))
+            print('>>>Readed point :%d '%(read_point,))
             print(">>>It took "+ str(time.time()-time_start)+" seconds.")
         except Exception as e:
             #print(e)
@@ -159,6 +177,7 @@ def dump_archives(archives,path):
             print('Error occurred ' + str(e)+': Read from Archive %d:'%(i,)+ " " + path )
 
 if __name__ == '__main__':
+    sys.stdout.write("\033[1;31m")
     time_start = time.time()
     print("Start time "+ datetime.utcfromtimestamp(time_start).strftime('%Y-%m-%d %H:%M:%S'))
     procs=[]
